@@ -75,7 +75,6 @@ function VideoPlayer({
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
     const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
-    const [currentTime, setCurrentTime] = useState(0);
     const [isReady, setIsReady] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -134,19 +133,6 @@ function VideoPlayer({
             cancelled = true;
         };
     }, [videoId, youtubeUrl]);
-
-    // Update current time
-    useEffect(() => {
-        const video = videoRef.current;
-        if (!video || !isReady) return;
-
-        const handleTimeUpdate = () => {
-            setCurrentTime(video.currentTime);
-        };
-
-        video.addEventListener("timeupdate", handleTimeUpdate);
-        return () => video.removeEventListener("timeupdate", handleTimeUpdate);
-    }, [isReady]);
 
     const takeSnapshot = useCallback(() => {
         const video = videoRef.current;
@@ -269,7 +255,7 @@ function VideoPlayer({
             <canvas ref={canvasRef} style={{ display: "none" }} />
 
             {isReady && (
-                <div style={{ marginTop: "8px", display: "flex", alignItems: "center", gap: "12px" }}>
+                <div style={{ marginTop: "8px" }}>
                     <button
                         onClick={takeSnapshot}
                         style={{
@@ -285,9 +271,6 @@ function VideoPlayer({
                     >
                         Snapshot
                     </button>
-                    <span style={{ fontSize: "14px", color: "#666" }}>
-                        Current: {formatTime(currentTime)}
-                    </span>
                 </div>
             )}
 

@@ -1,0 +1,60 @@
+.sidebar {
+  width: 240px;
+  height: 100vh;
+  background-color: var(--sidebar-bg);
+  border-right: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  position: fixed;
+  left: 0;
+  top: 0;
+}
+
+.logo {
+  padding: 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.logoText {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  padding: 12px;
+  gap: 4px;
+}
+
+.navItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--foreground-muted);
+  transition: background-color 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+  border: none;
+  background: none;
+  width: 100%;
+  font-size: 0.9rem;
+  text-align: left;
+  font-family: inherit;
+}
+
+.navItem:hover {
+  background-color: var(--hover-bg);
+  color: var(--foreground);
+}
+
+.navItem.active {
+  background-color: var(--active-bg);
+  color: var(--foreground);
+}
+
+.navItem svg {
+  flex-shrink: 0;
+}

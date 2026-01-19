@@ -1,12 +1,23 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --foreground-muted: #6b7280;
+  --sidebar-bg: #f9fafb;
+  --border-color: #e5e7eb;
+  --hover-bg: #f3f4f6;
+  --active-bg: #e5e7eb;
+  --sidebar-width: 240px;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --foreground-muted: #9ca3af;
+    --sidebar-bg: #111111;
+    --border-color: #27272a;
+    --hover-bg: #1f1f1f;
+    --active-bg: #27272a;
   }
 }
 
