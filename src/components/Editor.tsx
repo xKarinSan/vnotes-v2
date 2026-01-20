@@ -65,6 +65,10 @@ function YouTubeInput({ onSubmit }: { onSubmit: (url: string) => void }) {
     );
 }
 
+function getSnapshotStorageKey(videoId: string) {
+    return `vnotes-snapshots-${videoId}`;
+}
+
 function VideoPlayer({
     videoId,
     youtubeUrl,
@@ -74,11 +78,28 @@ function VideoPlayer({
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
-    const [snapshots, setSnapshots] = useState<Snapshot[]>([]);
+    const [snapshots, setSnapshots] = useState<Snapshot[]>(() => {
+        // Load snapshots from localStorage on init
+        if (typeof window === "undefined") return [];
+        const saved = localStorage.getItem(getSnapshotStorageKey(videoId));
+        if (saved) {
+            try {
+                return JSON.parse(saved);
+            } catch {
+                return [];
+            }
+        }
+        return [];
+    });
     const [isReady, setIsReady] = useState(false);
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState<string | null>(null);
     const [videoPath, setVideoPath] = useState<string | null>(null);
+
+    // Save snapshots to localStorage whenever they change
+    useEffect(() => {
+        localStorage.setItem(getSnapshotStorageKey(videoId), JSON.stringify(snapshots));
+    }, [videoId, snapshots]);
 
     // Check if video exists or download it
     useEffect(() => {
@@ -401,11 +422,41 @@ function getCustomSlashMenuItems(editor: any): DefaultReactSuggestionItem[] {
     return [...getDefaultReactSlashMenuItems(editor), insertYouTube(editor)];
 }
 
+const STORAGE_KEY = "vnotes-blocks";
+
 export default function Editor() {
-    const editor = useCreateBlockNote({ schema });
+    const editor = useCreateBlockNote({
+        schema,
+        initialContent: undefined,
+    });
+    const [isLoaded, setIsLoaded] = useState(false);
+
+    // Load saved content on mount
+    useEffect(() => {
+        const savedContent = localStorage.getItem(STORAGE_KEY);
+        if (savedContent) {
+            try {
+                const blocks = JSON.parse(savedContent);
+                editor.replaceBlocks(editor.document, blocks);
+            } catch (e) {
+                console.error("Failed to load saved content:", e);
+            }
+        }
+        setIsLoaded(true);
+    }, [editor]);
+
+    // Save content on change
+    const handleChange = useCallback(() => {
+        const blocks = editor.document;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(blocks));
+    }, [editor]);
+
+    if (!isLoaded) {
+        return null;
+    }
 
     return (
-        <BlockNoteView editor={editor} slashMenu={false}>
+        <BlockNoteView editor={editor} slashMenu={false} onChange={handleChange}>
             <SuggestionMenuController
                 triggerCharacter="/"
                 getItems={async (query) =>
