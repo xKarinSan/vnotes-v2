@@ -59,8 +59,111 @@
   overflow-y: auto;
 }
 
-.placeholder {
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--foreground);
+}
+
+.description {
+  font-size: 0.75rem;
   color: var(--foreground-muted);
-  text-align: center;
-  padding: 40px 0;
+  margin: 0 0 4px 0;
+}
+
+.inputGroup {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.input {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 0.875rem;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--background);
+  color: var(--foreground);
+  transition: border-color 0.15s ease;
+}
+
+.input:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.input::placeholder {
+  color: var(--foreground-muted);
+}
+
+.toggleButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: none;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--foreground-muted);
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.toggleButton:hover {
+  background-color: var(--hover-bg);
+  color: var(--foreground);
+}
+
+.buttonGroup {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.saveButton,
+.clearButton {
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.saveButton {
+  background-color: var(--accent-color, #3b82f6);
+  color: white;
+}
+
+.saveButton:hover:not(:disabled) {
+  background-color: var(--accent-color-hover, #2563eb);
+}
+
+.saveButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.clearButton {
+  background-color: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--foreground-muted);
+}
+
+.clearButton:hover:not(:disabled) {
+  background-color: var(--hover-bg);
+  color: var(--foreground);
+}
+
+.clearButton:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }

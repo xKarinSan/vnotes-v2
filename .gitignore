@@ -40,5 +40,7 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# vnotes config (contains API keys)
+.vnotes/
 
 videos
