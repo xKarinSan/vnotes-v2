@@ -74,11 +74,13 @@ async function extractAudio(
     );
 }
 
+// Max number of frames to extract (evenly distributed across video)
+const MAX_FRAMES = 20;
+
 // Extract frames from video and convert to base64
 async function extractFrames(
     videoPath: string,
-    outputDir: string,
-    intervalSeconds: number = 10
+    outputDir: string
 ): Promise<string[]> {
     // Create output directory
     if (!fs.existsSync(outputDir)) {
@@ -91,12 +93,14 @@ async function extractFrames(
     );
     const duration = parseFloat(durationOutput.trim());
 
-    // Calculate frame timestamps
-    const frameCount = Math.min(Math.ceil(duration / intervalSeconds), 20); // Max 20 frames
+    // Calculate evenly spaced timestamps across the entire video
+    const frameCount = Math.min(MAX_FRAMES, Math.ceil(duration / 10)); // At least 1 frame per 10 seconds, max MAX_FRAMES
+    const interval = duration / frameCount;
     const frames: string[] = [];
 
     for (let i = 0; i < frameCount; i++) {
-        const timestamp = i * intervalSeconds;
+        // Distribute frames evenly, starting slightly after 0 to avoid black intro frames
+        const timestamp = Math.min(interval * i + interval / 2, duration - 1);
         const frameFileName = `frame_${String(i).padStart(3, "0")}.jpg`;
         const framePath = path.join(outputDir, frameFileName);
         const base64Path = path.join(
@@ -161,59 +165,136 @@ function loadCachedTranscript(transcriptPath: string): string {
     return fs.readFileSync(transcriptPath, "utf-8");
 }
 
-// Generate summary using GPT-4o with frames and transcript
-async function generateSummary(
+// Generate visual summary from frames using GPT-4o
+async function generateVisualSummary(
     frames: string[],
-    transcript: string,
     apiKey: string
 ): Promise<string> {
     const openai = new OpenAI({ apiKey });
 
-    // Build the content array with images and text
     const content: OpenAI.Chat.Completions.ChatCompletionContentPart[] = [];
 
-    // Add instruction text
     content.push({
         type: "text",
-        text: `You are analyzing a video. Below are frames extracted from the video at regular intervals, followed by the audio transcript. Please provide a comprehensive summary of the video content.
-
-## Audio Transcript:
-${transcript}
+        text: `You are analyzing frames extracted from a video at regular intervals throughout its duration. Based solely on these visual frames, provide a summary of what you observe.
 
 ## Instructions:
-1. Describe what is happening in the video based on the visual frames
-2. Summarize the key points from the audio/transcript
-3. Identify main topics, themes, or subjects covered
-4. Note any important visual elements, demonstrations, or on-screen text
-5. Provide a concise but comprehensive summary
+1. Describe the visual content, scenes, and what appears to be happening
+2. Note any on-screen text, diagrams, demonstrations, or visual aids
+3. Identify the setting, people, or objects shown
+4. Describe any visual transitions or changes throughout the video
 
-Please provide your summary:`,
+Please provide your visual analysis:`,
     });
 
-    // Add frames as images (limit to avoid token limits)
-    const framesToUse = frames.slice(0, 10); // Use up to 10 frames
-    for (let i = 0; i < framesToUse.length; i++) {
+    const framesToUse = frames.slice(0, 10);
+    for (const frame of framesToUse) {
         content.push({
             type: "image_url",
             image_url: {
-                url: `data:image/jpeg;base64,${framesToUse[i]}`,
-                detail: "low", // Use low detail to save tokens
+                url: `data:image/jpeg;base64,${frame}`,
+                detail: "low",
             },
         });
     }
 
     const response = await openai.chat.completions.create({
         model: "gpt-4o",
+        messages: [{ role: "user", content }],
+        max_tokens: 1500,
+    });
+
+    return response.choices[0].message.content || "";
+}
+
+// Generate audio/transcript summary using GPT-4o
+async function generateAudioSummary(
+    transcript: string,
+    apiKey: string
+): Promise<string> {
+    const openai = new OpenAI({ apiKey });
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o",
         messages: [
             {
                 role: "user",
-                content: content,
+                content: `You are analyzing the audio transcript of a video. Based solely on this transcript, provide a summary of the spoken content.
+
+## Transcript:
+${transcript}
+
+## Instructions:
+1. Summarize the main topics and key points discussed
+2. Identify the speaker's main arguments or explanations
+3. Note any important terminology, names, or concepts mentioned
+4. Highlight any conclusions or takeaways
+
+Please provide your audio/transcript analysis:`,
+            },
+        ],
+        max_tokens: 1500,
+    });
+
+    return response.choices[0].message.content || "";
+}
+
+// Consolidate visual and audio summaries into final overview
+async function generateFinalSummary(
+    visualSummary: string,
+    audioSummary: string,
+    apiKey: string
+): Promise<string> {
+    const openai = new OpenAI({ apiKey });
+
+    const response = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: [
+            {
+                role: "user",
+                content: `You have been given two separate analyses of a video - one based on visual frames and one based on the audio transcript. Your task is to consolidate these into a single, comprehensive overview.
+
+## Visual Analysis:
+${visualSummary}
+
+## Audio/Transcript Analysis:
+${audioSummary}
+
+## Instructions:
+1. Synthesize both analyses into a cohesive summary
+2. Identify how the visual and audio content complement each other
+3. Highlight the main themes, key points, and takeaways
+4. Note any discrepancies or additional insights from combining both sources
+5. Provide a well-structured, comprehensive overview that captures the full essence of the video
+
+Please provide your consolidated summary:`,
             },
         ],
         max_tokens: 2000,
     });
 
     return response.choices[0].message.content || "";
+}
+
+// Main summarization pipeline: visual -> audio -> consolidate
+async function generateSummary(
+    frames: string[],
+    transcript: string,
+    apiKey: string
+): Promise<{ visualSummary: string; audioSummary: string; finalSummary: string }> {
+    // Step 1: Analyze visual frames
+    console.log("Generating visual summary...");
+    const visualSummary = await generateVisualSummary(frames, apiKey);
+
+    // Step 2: Analyze audio transcript
+    console.log("Generating audio summary...");
+    const audioSummary = await generateAudioSummary(transcript, apiKey);
+
+    // Step 3: Consolidate into final overview
+    console.log("Generating consolidated summary...");
+    const finalSummary = await generateFinalSummary(visualSummary, audioSummary, apiKey);
+
+    return { visualSummary, audioSummary, finalSummary };
 }
 
 export async function POST(request: NextRequest) {
@@ -284,14 +365,16 @@ export async function POST(request: NextRequest) {
             frames = await extractFrames(videoPath, cached.framesDir);
         }
 
-        // Generate summary with GPT-4o
+        // Generate summary with GPT-4o (3-step process)
         console.log(`Generating summary for ${videoId}`);
-        const summary = await generateSummary(frames, transcript, apiKey);
+        const { visualSummary, audioSummary, finalSummary } = await generateSummary(frames, transcript, apiKey);
 
         return NextResponse.json({
             success: true,
             videoId,
-            summary,
+            summary: finalSummary,
+            visualSummary,
+            audioSummary,
             frameCount: frames.length,
             cached: {
                 audio: cached.hasAudio,
