@@ -72,9 +72,14 @@ function getSnapshotStorageKey(videoId: string) {
 function VideoPlayer({
     videoId,
     youtubeUrl,
+    blockId,
+    editor,
 }: {
     videoId: string;
     youtubeUrl: string;
+    blockId: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    editor: any;
 }) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -95,6 +100,7 @@ function VideoPlayer({
     const [isDownloading, setIsDownloading] = useState(false);
     const [downloadError, setDownloadError] = useState<string | null>(null);
     const [videoPath, setVideoPath] = useState<string | null>(null);
+    const [isSummarizing, setIsSummarizing] = useState(false);
 
     // Save snapshots to localStorage whenever they change
     useEffect(() => {
@@ -200,6 +206,34 @@ function VideoPlayer({
         setSnapshots((prev) => prev.filter((_, i) => i !== index));
     }, []);
 
+    const handleSummarize = useCallback(async () => {
+        setIsSummarizing(true);
+        try {
+            const response = await fetch("/api/summarize", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ videoId }),
+            });
+            const data = await response.json();
+
+            if (data.success && data.summary) {
+                // Insert a paragraph block with the summary after the YouTube block
+                editor.insertBlocks(
+                    [{ type: "paragraph", content: data.summary }],
+                    blockId,
+                    "after"
+                );
+            } else {
+                alert(data.error || "Failed to generate summary");
+            }
+        } catch (error) {
+            console.error("Summarization error:", error);
+            alert("Failed to generate summary");
+        } finally {
+            setIsSummarizing(false);
+        }
+    }, [videoId, editor, blockId]);
+
     if (isDownloading) {
         return (
             <div style={{
@@ -276,7 +310,7 @@ function VideoPlayer({
             <canvas ref={canvasRef} style={{ display: "none" }} />
 
             {isReady && (
-                <div style={{ marginTop: "8px" }}>
+                <div style={{ marginTop: "8px", display: "flex", gap: "8px" }}>
                     <button
                         onClick={takeSnapshot}
                         style={{
@@ -291,6 +325,22 @@ function VideoPlayer({
                         }}
                     >
                         Snapshot
+                    </button>
+                    <button
+                        onClick={handleSummarize}
+                        disabled={isSummarizing}
+                        style={{
+                            padding: "8px 16px",
+                            background: isSummarizing ? "#9ca3af" : "#10b981",
+                            color: "white",
+                            border: "none",
+                            borderRadius: "4px",
+                            cursor: isSummarizing ? "not-allowed" : "pointer",
+                            fontSize: "14px",
+                            fontWeight: 500,
+                        }}
+                    >
+                        {isSummarizing ? "Summarizing..." : "Summarize"}
                     </button>
                 </div>
             )}
@@ -392,7 +442,7 @@ const YouTubeBlock = createReactBlockSpec(
                 );
             }
 
-            return <VideoPlayer videoId={videoId} youtubeUrl={block.props.url} />;
+            return <VideoPlayer videoId={videoId} youtubeUrl={block.props.url} blockId={block.id} editor={editor} />;
         },
     }
 );

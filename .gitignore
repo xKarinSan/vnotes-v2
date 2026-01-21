@@ -43,4 +43,8 @@ next-env.d.ts
 # vnotes config (contains API keys)
 .vnotes/
 
-videos
+# media files
+public/videos/
+public/audio/
+public/frames/
+public/transcripts/
