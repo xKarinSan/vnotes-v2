@@ -36,6 +36,113 @@ function formatTime(seconds: number): string {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
 }
 
+// Parse inline markdown (bold, italic) into BlockNote styled text
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseInlineMarkdown(text: string): any[] {
+    const result: { type: "text"; text: string; styles: Record<string, boolean> }[] = [];
+    let remaining = text;
+
+    while (remaining.length > 0) {
+        // Match **bold** or __bold__
+        const boldMatch = remaining.match(/^(\*\*|__)(.+?)\1/);
+        if (boldMatch) {
+            result.push({ type: "text", text: boldMatch[2], styles: { bold: true } });
+            remaining = remaining.slice(boldMatch[0].length);
+            continue;
+        }
+
+        // Match *italic* or _italic_
+        const italicMatch = remaining.match(/^(\*|_)(.+?)\1/);
+        if (italicMatch) {
+            result.push({ type: "text", text: italicMatch[2], styles: { italic: true } });
+            remaining = remaining.slice(italicMatch[0].length);
+            continue;
+        }
+
+        // Find next special character
+        const nextSpecial = remaining.search(/[\*_]/);
+        if (nextSpecial === -1) {
+            // No more special characters
+            result.push({ type: "text", text: remaining, styles: {} });
+            break;
+        } else if (nextSpecial === 0) {
+            // Special char at start but didn't match pattern, treat as text
+            result.push({ type: "text", text: remaining[0], styles: {} });
+            remaining = remaining.slice(1);
+        } else {
+            // Add plain text before special char
+            result.push({ type: "text", text: remaining.slice(0, nextSpecial), styles: {} });
+            remaining = remaining.slice(nextSpecial);
+        }
+    }
+
+    return result;
+}
+
+// Parse markdown text into BlockNote block array
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function parseMarkdownToBlocks(markdown: string): any[] {
+    const lines = markdown.split("\n");
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const blocks: any[] = [];
+    let i = 0;
+
+    while (i < lines.length) {
+        const line = lines[i];
+
+        // Skip empty lines
+        if (line.trim() === "") {
+            i++;
+            continue;
+        }
+
+        // Headings: # to ###### (h1 to h6, but BlockNote only supports 1-3)
+        const headingMatch = line.match(/^(#{1,6}) /);
+        if (headingMatch) {
+            const hashes = headingMatch[1].length;
+            // BlockNote only supports levels 1-3, so cap at 3
+            const level = Math.min(hashes, 3) as 1 | 2 | 3;
+            blocks.push({
+                type: "heading",
+                props: { level },
+                content: parseInlineMarkdown(line.slice(hashes + 1).trim()),
+            });
+            i++;
+            continue;
+        }
+
+        // Bullet list item: - item or * item
+        if (line.match(/^[\-\*] /)) {
+            blocks.push({
+                type: "bulletListItem",
+                content: parseInlineMarkdown(line.slice(2).trim()),
+            });
+            i++;
+            continue;
+        }
+
+        // Numbered list item: 1. item
+        if (line.match(/^\d+\. /)) {
+            const content = line.replace(/^\d+\. /, "").trim();
+            blocks.push({
+                type: "numberedListItem",
+                content: parseInlineMarkdown(content),
+            });
+            i++;
+            continue;
+        }
+
+        // Regular paragraph
+        blocks.push({
+            type: "paragraph",
+            content: parseInlineMarkdown(line.trim()),
+        });
+        i++;
+    }
+
+    return blocks;
+}
+
 function YouTubeInput({ onSubmit }: { onSubmit: (url: string) => void }) {
     const [inputValue, setInputValue] = useState("");
 
@@ -217,12 +324,9 @@ function VideoPlayer({
             const data = await response.json();
 
             if (data.success && data.summary) {
-                // Insert a paragraph block with the summary after the YouTube block
-                editor.insertBlocks(
-                    [{ type: "paragraph", content: data.summary }],
-                    blockId,
-                    "after"
-                );
+                // Parse markdown summary into BlockNote blocks
+                const blocks = parseMarkdownToBlocks(data.summary);
+                editor.insertBlocks(blocks, blockId, "after");
             } else {
                 alert(data.error || "Failed to generate summary");
             }

@@ -267,6 +267,12 @@ ${audioSummary}
 4. Note any discrepancies or additional insights from combining both sources
 5. Provide a well-structured, comprehensive overview that captures the full essence of the video
 
+## Formatting Requirements:
+- Use markdown headings (## for sections, ### for subsections)
+- Use bullet points (- item) for lists of key points
+- Use **bold** for important terms or concepts
+- Keep paragraphs concise and well-organized
+
 Please provide your consolidated summary:`,
             },
         ],
