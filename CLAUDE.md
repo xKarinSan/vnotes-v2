@@ -4,52 +4,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-vnotes-v2 is a Next.js 16 note-taking application with rich-text editing and YouTube video embedding capabilities. It uses React 19, TypeScript, and the BlockNote editor framework.
+VNotes is a note-taking application with YouTube video embedding, video summarization using OpenAI, and snapshot capture capabilities. Built with Next.js 16, React 19, and BlockNote editor. Can run as a web app or Tauri desktop app.
 
 ## Development Commands
 
 ```bash
-npm run dev      # Start development server
-npm run build    # Production build
-npm run start    # Start production server
-npm run lint     # Run ESLint
+npm run dev          # Start Next.js development server
+npm run build        # Production build
+npm run lint         # Run ESLint
+
+# Tauri desktop app
+npm run tauri:dev    # Run Tauri development (starts Next.js + Tauri)
+npm run tauri:build  # Build Tauri desktop app (outputs to src-tauri/target/)
 ```
 
 ## Architecture
 
-### Key Technologies
-- **Editor:** BlockNote (@blocknote/core, @blocknote/react, @blocknote/mantine)
-- **UI Components:** Mantine (@mantine/core, @mantine/hooks)
-- **YouTube Integration:** youtubei.js (Innertube client for video downloads)
-- **Styling:** CSS Modules + global CSS variables with dark mode support
+### Tech Stack
+- **Framework:** Next.js 16 (App Router)
+- **Editor:** BlockNote with custom YouTube block type
+- **UI:** Mantine v8 + CSS Modules
+- **Desktop:** Tauri v2 (Rust backend, webview frontend)
+- **AI:** OpenAI GPT-4o for summarization, Whisper for transcription
+- **YouTube:** youtubei.js (Innertube client) for video downloads
 
 ### Path Alias
-- `@/*` maps to `./src/*`
+`@/*` maps to `./src/*`
 
-### Core Components
+### Data Flow
 
-**Editor Component** (`src/components/Editor.tsx`)
-- Main rich-text editor built on BlockNote
-- Custom YouTube video block type with:
-  - URL input validation and video ID extraction
-  - Local video playback from downloaded files
-  - Time-stamped snapshot capture using Canvas API
-  - Slash menu integration (`/youtube` command)
+**Video Summarization Pipeline** (3-step process in `/api/summarize`):
+1. Extract audio → Whisper transcription → audio summary
+2. Extract frames (max 20, evenly distributed) → GPT-4o visual analysis
+3. Consolidate both summaries → final markdown summary → parsed into BlockNote blocks
 
-**YouTube API** (`src/app/api/youtube/route.ts`)
-- GET: Check if video exists locally
-- POST: Download YouTube video to `public/videos/{videoId}.mp4`
-- Uses Innertube with ANDROID client for progressive formats
+**Local Storage:**
+- Videos: `public/videos/{videoId}.mp4`
+- Audio: `public/audio/{videoId}.mp3`
+- Frames: `public/frames/{videoId}/frame_XXX.txt` (base64)
+- Transcripts: `public/transcripts/{videoId}.txt`
+- API keys: `.vnotes/keys.json`
+- Editor content: `localStorage` key `vnotes-blocks`
+- Snapshots: `localStorage` key `vnotes-snapshots-{videoId}`
 
-### Client-Side Rendering Pattern
-The Editor component is dynamically imported with `ssr: false` to avoid hydration issues:
+### Key Patterns
+
+**Client-Side Editor:** The BlockNote Editor component must be dynamically imported with `ssr: false` to avoid hydration issues:
 ```tsx
 const Editor = dynamic(() => import("@/components/Editor"), { ssr: false });
 ```
 
-### File Storage
-Downloaded videos are stored in `public/videos/` (gitignored).
+**Custom BlockNote Block:** The YouTube block (`src/components/Editor.tsx`) demonstrates:
+- `createReactBlockSpec` for custom block types
+- `BlockNoteSchema.create` to extend default schema
+- Custom slash menu items via `getDefaultReactSlashMenuItems`
 
-## Environment Variables
+**Tauri Build Config:** `next.config.ts` conditionally enables static export (`output: "export"`) only during Tauri production builds via `TAURI_ENV_PLATFORM` check.
 
-- `NEXT_INNERTUBE_KEY`: YouTube API key (stored in `.env`)
+### External Dependencies
+- **ffmpeg:** Required for audio extraction and frame capture (must be installed on system)
+- **OpenAI API key:** Stored in `.vnotes/keys.json`, configured via Settings modal
